@@ -1,0 +1,15 @@
+Tomcat 设计了两个核⼼组件连接器（Connector）和容器（Container）来完成 Tomcat 的两个核心功能
+
+1.连接器(Coyote)，负责对外交流： 处理Socket连接，负责⽹络字节流与Request和Response对象的转化；
+    Coyote 组件及作用
+    EndPoint:EndPoint 是 Coyote 通信端点，即通信监听的接⼝，是具体Socket接收和发送处理器，是对传输层的抽象，因此EndPoint⽤来实现TCP/IP协议的
+    Processor:Processor 是Coyote 协议处理接⼝ ，如果说EndPoint是⽤来实现TCP/IP协议的，那么Processor用来实现HTTP协议，Processor接收EndPoint的Socket，读取字节流解析成Tomcat Request和Response对象，
+               并通过Adapter将其提交到容器处理，Processor是对应⽤层协议的抽象
+    ProtocolHandler:Coyote 协议接⼝， 通过Endpoint 和 Processor ， 实现针对具体协议的处理能
+    Adapter:由于协议不同，客户端发过来的请求信息也不尽相同，Tomcat定义了自己的Request类来封装这些请求信息。
+2.容器，负责内部处理：加载和管理Servlet，以及具体处理Request请求；
+   Container 组件的具体结构
+   Engine:表示整个Catalina的Servlet引擎，⽤来管理多个虚拟站点，⼀个Service最多只能有⼀个Engine，但是一个引擎可包含多个Host
+   Host:代表一个虚拟主机，或者说一个站点，可以给Tomcat配置多个虚拟主机地址，一个虚拟主机下可包含多个Context
+   Context:表示一个Web应⽤程序， 一个Web应用可包含多个Wrapper
+   Wrapper:表示一个Servlet，Wrapper 作为容器中的最底层，不能包含子容器

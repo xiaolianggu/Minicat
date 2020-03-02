@@ -8,7 +8,7 @@ public class FileUtils
 {
   public static void main(String[] args)
   {
-    String path = "E:\\webapp";
+    String path = "C:\\Users\\v-guxiaoliang\\git\\Minicat\\src\\main\\resources\\webapp";
     File f = new File(path);
     List appNameList = getDir(path);
     System.out.println(appNameList);

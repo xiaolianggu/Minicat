@@ -21,8 +21,8 @@ public class DiskClassLoader
     }
     return null;
   }
-  public static void main(String[] args) {
-    Class cls = loadClass("E:\\webapp\\demo1", "server.LagouServlet");
-    System.out.println(cls);
+  public static void main(String[] args) throws Exception {
+    Class cls = loadClass("C:\\Users\\v-guxiaoliang\\git\\Minicat\\src\\main\\resources\\webapp\\demo2", "server.LagouServlet2");
+    System.out.println(cls.newInstance());
   }
 }

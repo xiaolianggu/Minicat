@@ -1,20 +1,33 @@
 package server;
 
-import org.dom4j.Document;
-import org.dom4j.DocumentException;
-import org.dom4j.Element;
-import org.dom4j.Node;
-import org.dom4j.io.SAXReader;
-
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import org.dom4j.Document;
+import org.dom4j.DocumentException;
+import org.dom4j.Element;
+import org.dom4j.io.SAXReader;
+
+import util.DiskClassLoader;
+import util.FileUtils;
+import webresource.Context;
+import webresource.Host;
+import webresource.Wrapper;
 
 /**
  * Minicat的主类
@@ -31,7 +44,8 @@ public class Bootstrap {
     public void setPort(int port) {
         this.port = port;
     }
-
+    
+    private static Map<String,Host> hostMap = new HashMap<String,Host>();
 
     /**
      * Minicat启动需要初始化展开的一些操作
@@ -41,7 +55,7 @@ public class Bootstrap {
         // 加载解析相关的配置，web.xml
         loadServlet();
 
-
+        loadServer();
         // 定义一个线程池
         int corePoolSize = 10;
         int maximumPoolSize =50;
@@ -146,7 +160,7 @@ public class Bootstrap {
         while(true) {
 
             Socket socket = serverSocket.accept();
-            RequestProcessor requestProcessor = new RequestProcessor(socket,servletMap);
+            RequestProcessor requestProcessor = new RequestProcessor(socket,servletMap,hostMap);
             //requestProcessor.start();
             threadPoolExecutor.execute(requestProcessor);
         }
@@ -200,6 +214,83 @@ public class Bootstrap {
             e.printStackTrace();
         }
 
+    }
+
+    
+    private List<Wrapper> loadServlet(String webXmlPath) {
+    	
+        try {
+        	InputStream resourceAsStream = new FileInputStream(webXmlPath+File.separator+"web.xml");
+            SAXReader saxReader = new SAXReader();
+            Document document = saxReader.read(resourceAsStream);
+            Element rootElement = document.getRootElement();
+
+            List<Element> selectNodes = rootElement.selectNodes("//servlet");
+            List<Wrapper> wrapperList = new ArrayList<Wrapper>();
+            for (int i = 0; i < selectNodes.size(); i++) {
+                Element element =  selectNodes.get(i);
+                Element servletnameElement = (Element) element.selectSingleNode("servlet-name");
+                String servletName = servletnameElement.getStringValue();
+                Element servletclassElement = (Element) element.selectSingleNode("servlet-class");
+                String servletClass = servletclassElement.getStringValue();
+
+
+                // 根据servlet-name的值找到url-pattern
+                Element servletMapping = (Element) rootElement.selectSingleNode("/web-app/servlet-mapping[servlet-name='" + servletName + "']");
+                String urlPattern = servletMapping.selectSingleNode("url-pattern").getStringValue();
+                
+                Wrapper wrapper = new Wrapper();
+                wrapper.setServletName(servletName);
+                wrapper.setUrlPattern(urlPattern);
+                wrapper.setServlet((HttpServlet)DiskClassLoader.loadClass(webXmlPath, servletClass).newInstance());
+                wrapperList.add(wrapper);
+            }
+
+           return wrapperList;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
+    private List<Wrapper> loadServer() {
+    	
+        try {
+        	InputStream resourceAsStream = this.getClass().getClassLoader().getResourceAsStream("server.xml");
+            SAXReader saxReader = new SAXReader();
+            Document document = saxReader.read(resourceAsStream);
+            Element rootElement = document.getRootElement();
+
+            List<Element> selectNodes = rootElement.selectNodes("//Host");
+            for (int i = 0; i < selectNodes.size(); i++) {
+                Element element =  selectNodes.get(i);
+                String name = element.attribute("name").getStringValue();
+                String appBase = element.attribute("appBase").getStringValue();
+                Host host = new Host();
+                host.setName(name);
+                host.setAppBase(appBase);
+                List<String> appPathList = FileUtils.getDir(appBase);
+                if(appPathList!=null&&!appPathList.isEmpty()) {
+                	List<Context> contextList = new ArrayList<Context>();
+                	for(String appPath:appPathList) {
+                		Context context = new Context();
+                		 List<Wrapper> wrapperList =  loadServlet(appPath);
+                		 context.setAppName(appPath.substring(appPath.lastIndexOf(File.separator)).substring(1));
+                		 context.setWrapperList(wrapperList);
+                		 contextList.add(context);
+                	}
+                	host.setContextList(contextList);
+                }
+                hostMap.put(name, host);
+            }
+
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
 
